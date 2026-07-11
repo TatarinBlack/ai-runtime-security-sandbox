@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Runtime Security Sandbox — RAG Chatbot</title>
+<link rel="stylesheet" href="/static/style.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="scanlines"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">◈</span>
+    <div class="brand-text">
+      <h1>AI Runtime Security <span class="accent">Sandbox</span></h1>
+      <p>RAG Chatbot Security — Live Attack / Defense Demo</p>
+    </div>
+  </div>
+
+  <nav class="topnav">
+    <button class="nav-btn" id="openArchitecture">⌗ System Architecture</button>
+  </nav>
+
+  <div class="mode-switch" id="modeSwitch">
+    <div class="mode-label" id="modeLabel">VULNERABLE MODE</div>
+    <button class="toggle" id="secureToggle" aria-label="secure mode toggle">
+      <span class="toggle-knob"></span>
+    </button>
+    <div class="mode-caption" id="modeCaption">Guardrails are OFF — the system runs in its unprotected state</div>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- LEFT PANEL -->
+  <aside class="panel left-panel">
+    <section class="block">
+      <h2>LLM Provider</h2>
+      <div id="providerList" class="provider-list"></div>
+    </section>
+
+    <section class="block">
+      <h2>Demo Scenarios</h2>
+      <div id="scenarioList" class="scenario-list"></div>
+    </section>
+
+    <section class="block">
+      <h2>Knowledge Base <span class="muted" id="docCount"></span></h2>
+      <div id="docList" class="doc-list"></div>
+    </section>
+  </aside>
+
+  <!-- CENTER: CHAT -->
+  <section class="panel chat-panel">
+    <div class="chat-window" id="chatWindow">
+      <div class="msg system">
+        <div class="msg-bubble">
+          Hi, I'm the NovaTech Solutions RAG assistant. Pick a scenario on the left, or ask
+          anything freely. Use the <b>Secure Mode</b> switch (top right) to flip guardrails
+          on/off and see the same attack get blocked live.
+        </div>
+      </div>
+    </div>
+    <form id="chatForm" class="chat-input-row">
+      <input id="chatInput" type="text" placeholder="Type a message…" autocomplete="off" />
+      <button type="submit" id="sendBtn">Send ⏎</button>
+    </form>
+  </section>
+
+  <!-- RIGHT PANEL -->
+  <aside class="panel right-panel">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="flow">Attack Flow</button>
+      <button class="tab-btn" data-tab="context">Retrieved Context</button>
+      <button class="tab-btn" data-tab="log">Security Log</button>
+      <button class="tab-btn" data-tab="tools">Tool Events</button>
+    </div>
+
+    <div class="tab-content active" id="tab-flow">
+      <p class="empty-hint">Select a scenario on the left to see the attacker's path, the exact
+        document in the knowledge base being exploited, and the presenter script for it.</p>
+    </div>
+    <div class="tab-content" id="tab-context">
+      <p class="empty-hint">No query yet.</p>
+    </div>
+    <div class="tab-content" id="tab-log">
+      <p class="empty-hint">Log is empty.</p>
+    </div>
+    <div class="tab-content" id="tab-tools">
+      <p class="empty-hint">No tool calls yet.</p>
+    </div>
+  </aside>
+
+</main>
+
+<footer class="statusbar">
+  <span id="statusText">Ready.</span>
+  <span class="statusbar-right">NovaTech Solutions · AI Runtime Security Sandbox · localhost</span>
+</footer>
+
+<!-- ARCHITECTURE MODAL -->
+<div class="modal-backdrop" id="architectureModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>System Architecture</h2>
+      <button class="modal-close" id="closeArchitecture">✕</button>
+    </div>
+    <div class="modal-body" id="architectureBody">
+      <!-- filled by app.js -->
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
