@@ -6,6 +6,8 @@
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](requirements.txt)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](app/main.py)
 [![Status: Demo](https://img.shields.io/badge/Status-Educational%20Demo-ffb454.svg)](SECURITY.md)
+[![GitHub stars](https://img.shields.io/github/stars/TatarinBlack/ai-runtime-security-sandbox?style=flat&color=34e6d8)](https://github.com/TatarinBlack/ai-runtime-security-sandbox/stargazers)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-34e6d8.svg)](CONTRIBUTING.md)
 
 > ⚠️ **This is an intentionally vulnerable educational sandbox.** It is built
 > to demonstrate real attack techniques against a RAG chatbot, live, in a
@@ -30,6 +32,8 @@ Culture track). Slides are in [`/slides`](slides/).
 - [Knowledge base](#knowledge-base)
 - [Troubleshooting](#troubleshooting)
 - [Slides](#slides)
+- [Related projects](#related-projects)
+- [Contributing](#contributing)
 - [License](#license)
 
 ## Why this exists
@@ -155,11 +159,35 @@ reference architecture, the 4 primary scenarios as presenter cue cards, the
 sandbox → Azure AI Agent design-pattern mapping, and governance takeaways.
 Speaker notes are embedded per slide.
 
+## Related projects
+
+This sandbox sits in a growing space of hands-on LLM security tooling. A few
+others worth knowing about:
+
+- **[OWASP PromptMe](https://owasp.org/www-project-promptme/)** — a
+  CTF-style vulnerable app mapped to the OWASP LLM Top 10, flag-capture format.
+- **Damn Vulnerable LLM Application** — a broader vulnerable-by-design
+  playground covering multiple LLM attack classes.
+- **[PaulDuvall/owasp_llm_top10](https://github.com/PaulDuvall/owasp_llm_top10)**
+  — minimal `vulnerable.py` / `mitigated.py` pairs per OWASP risk, workshop-oriented.
+- **Lakera Gandalf / HackAPrompt Playground** — browser-based prompt
+  injection challenges, general LLM red-teaming practice rather than RAG-specific.
+
+**Where this one differs:** it's built specifically for a *live, narrated
+30–40 minute conference demo* rather than a CTF or a library of isolated
+snippets — one click loads a full attacker-controlled document into a real
+RAG pipeline, a single `Secure Mode` toggle re-runs the identical attack
+through the same guardrail stack, and the in-app Attack Flow panel narrates
+the retrieval → context → tool path for an audience with zero prior context.
+It also runs 100% offline via a deterministic mock provider, so the demo
+never depends on venue Wi-Fi or a live API key.
+
 ## Contributing
 
-This is a talk companion project, not an actively maintained framework — but
-issues and PRs for bugs, new scenarios, or additional provider support are
-welcome.
+This started as a conference talk companion but is now open for outside
+contributions — new scenarios, new provider integrations, doc fixes, bug
+reports. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to propose a change,
+and [CHANGELOG.md](CHANGELOG.md) for what's shipped so far.
 
 ## License
 
