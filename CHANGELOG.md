@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.0] — 2026-07-22
+
+### Added
+
+- **7th scenario: MCP Tool Poisoning (Rug Pull)** — a hidden directive
+  embedded in an MCP tool's own description (not in a business document)
+  silently triggers a tool call the moment the agent enumerates its tools.
+  New document: `data/documents/mcp_tool_registry_poisoned.md`.
+- Mapping to the newly published **OWASP Top 10 for Agentic Applications
+  (2026)** (ASI01–ASI10) alongside the existing OWASP LLM Top 10 mapping,
+  shown in the in-app Architecture view and the README scenario table.
+- "Real-world context" section in the README referencing EchoLeak
+  (Microsoft 365 Copilot zero-click prompt injection, June 2025) and the
+  broader 2025–2026 rise of MCP tool-poisoning attacks.
+- DefansX branding in the app header (logo + refreshed button/card styling
+  across the UI, tied to the brand's cyan-to-blue palette).
+- `CONTRIBUTING.md`, this `CHANGELOG.md`, and a "Related projects" section
+  in the README.
+
 ## [1.0.0] — 2026-07-09
 
 Initial public release.

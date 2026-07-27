@@ -14,10 +14,11 @@
 > conference talk. Do not deploy it to a public or production environment.
 > Full disclaimer in [SECURITY.md](SECURITY.md).
 
-Six live attack scenarios, one click each, with a `Secure Mode` switch that
+Seven live attack scenarios, one click each, with a `Secure Mode` switch that
 shows the exact same attack get blocked in real time — plus an in-app
 Architecture view and an Attack Flow panel so an audience can follow along
-without a single slide.
+without a single slide. Mapped to both the OWASP Top 10 for LLM Applications
+and the brand-new **OWASP Top 10 for Agentic Applications (2026)**.
 
 Built as the companion sandbox for the talk *"AI Runtime Security: Breaking
 (and Defending) RAG Chatbots — Live"* (Azure OpenAI · RAG Agents · Process &
@@ -28,7 +29,8 @@ Culture track). Slides are in [`/slides`](slides/).
 - [Why this exists](#why-this-exists)
 - [Quickstart](#quickstart)
 - [Architecture](#architecture-short-version)
-- [The 6 demo scenarios](#the-6-demo-scenarios)
+- [The 7 demo scenarios](#the-7-demo-scenarios)
+- [Real-world context](#real-world-context)
 - [Knowledge base](#knowledge-base)
 - [Troubleshooting](#troubleshooting)
 - [Slides](#slides)
@@ -41,11 +43,13 @@ Culture track). Slides are in [`/slides`](slides/).
 Traditional security controls protect networks, endpoints, identities, and
 applications. RAG chatbots and AI agents open a new attack surface: prompts
 become input, models become decision engines, agents execute actions, and
-tools get direct access to business systems. This sandbox makes five of the
-OWASP LLM Top 10 risk categories reproducible and demonstrable in minutes,
-against your choice of Azure OpenAI, OpenAI, Anthropic Claude, Google Gemini,
-or any local OpenAI-compatible model — with zero setup cost thanks to a
-built-in offline mock model.
+tools get direct access to business systems. This sandbox makes five OWASP
+LLM Top 10 risk categories, plus one from the newly published **OWASP Top
+10 for Agentic Applications (2026)** — ASI04: Agentic Supply Chain
+Vulnerabilities, via an MCP tool poisoning demo — reproducible and
+demonstrable in minutes, against your choice of Azure OpenAI, OpenAI,
+Anthropic Claude, Google Gemini, or any local OpenAI-compatible model, with
+zero setup cost thanks to a built-in offline mock model.
 
 ## Quickstart
 
@@ -94,7 +98,7 @@ the intentionally vulnerable baseline. Click **⌗ System Architecture** in the
 top bar to show this pipeline, the knowledge base contents, and the full
 scenario → OWASP LLM Top 10 mapping table live, without leaving the app.
 
-## The 6 demo scenarios
+## The 7 demo scenarios
 
 Every scenario card in the left panel pre-fills the attack prompt into the
 chat box (no live typing, no typo risk) and — as soon as you click it — opens
@@ -106,14 +110,19 @@ the **Attack Flow** tab on the right, which shows for a general audience:
 - what "PROTECTED" mode does differently, mechanically
 - a presenter script (what to say, what to click)
 
-| # | Scenario | OWASP LLM Top 10 | Target document |
-|---|---|---|---|
-| 1 | Indirect Prompt Injection | LLM01 (Indirect) | `vendor_terms_poisoned.md` |
-| 2 | Data Leakage | LLM06 | `confidential_salaries.md` |
-| 3 | Excessive Agency — Tool Abuse (exfiltration) | LLM08 | `support_ticket_with_tool_injection.md` |
-| 4 | Direct Jailbreak | LLM01 (Direct) | none — the user is the attacker |
-| 5 | Insecure Output Handling — Markdown Exfiltration | LLM02 | `marketing_newsletter_poisoned.md` |
-| 6 | Excessive Agency — Destructive Tool Call | LLM08 | `it_maintenance_request_poisoned.md` |
+| # | Scenario | OWASP LLM Top 10 | OWASP Agentic Top 10 (2026) | Target document |
+|---|---|---|---|---|
+| 1 | Indirect Prompt Injection | LLM01 (Indirect) | ASI01: Agent Goal Hijack | `vendor_terms_poisoned.md` |
+| 2 | Data Leakage | LLM06 | — | `confidential_salaries.md` |
+| 3 | Excessive Agency — Tool Abuse (exfiltration) | LLM08 | ASI02: Tool Misuse | `support_ticket_with_tool_injection.md` |
+| 4 | Direct Jailbreak | LLM01 (Direct) | — | none — the user is the attacker |
+| 5 | Insecure Output Handling — Markdown Exfiltration | LLM02 | — | `marketing_newsletter_poisoned.md` |
+| 6 | Excessive Agency — Destructive Tool Call | LLM08 | ASI02: Tool Misuse | `it_maintenance_request_poisoned.md` |
+| 7 | MCP Tool Poisoning (Rug Pull) | LLM08 | ASI04: Agentic Supply Chain Vulnerabilities | `mcp_tool_registry_poisoned.md` |
+
+Rows marked "—" aren't agent/tool-specific attacks, so the Agentic Top 10
+doesn't add coverage beyond the LLM Top 10 for those (per OWASP's own
+guidance on when each list applies).
 
 Suggested rhythm for each one, live: **click the card → send with Secure Mode
 OFF (attack succeeds) → flip Secure Mode ON → send the exact same message
@@ -123,6 +132,28 @@ With `mock` selected, everything is 100% deterministic and works offline. A
 real provider (OpenAI/Claude/Gemini/Azure OpenAI) behaves more "realistically"
 but less predictably — that difference is itself worth calling out live.
 
+## Real-world context
+
+These aren't lab-only hypotheticals:
+
+- **EchoLeak** (disclosed June 2025) was a zero-click indirect prompt
+  injection against Microsoft 365 Copilot — a single crafted email caused
+  Copilot to read internal files and transmit their contents to an
+  attacker-controlled server, with no user interaction at all. It's the
+  real-world sibling of this sandbox's Indirect Prompt Injection and
+  Markdown Exfiltration scenarios.
+- **MCP tool poisoning** ("rug pull" and "tool shadowing" attacks) emerged
+  through 2025–2026 as the highest-leverage attack on enterprise AI agents,
+  exploiting the fact that a tool's description is read by the agent but
+  never shown to the human operator. Security scans of MCP server
+  implementations have found command-injection and path-traversal flaws in
+  a large share of real deployments. Scenario 7 in this sandbox is a
+  minimal, safe reproduction of that exact attack shape.
+- **OWASP Top 10 for Agentic Applications (2026)** (ASI01–ASI10), published
+  December 2025, formalized these agent-specific risks as a companion
+  taxonomy to the existing OWASP Top 10 for LLM Applications — this
+  sandbox maps to both.
+
 ## Knowledge base
 
 `data/documents/*.md` — each file starts with a small frontmatter block:
@@ -130,7 +161,7 @@ but less predictably — that difference is itself worth calling out live.
 ```
 ---
 classification: public | internal | confidential
-scenario: general | injection | leakage | agency | exfiltration | destructive_agency
+scenario: general | injection | leakage | agency | exfiltration | destructive_agency | tool_poisoning
 ---
 ```
 

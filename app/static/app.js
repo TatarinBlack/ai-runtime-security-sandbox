@@ -99,10 +99,12 @@ function renderAttackFlow(s) {
       <div class="kv"><span>Attacker</span><span>the end user, typed directly</span></div>
     </div>
   `;
+  const asiBadge = s.asi ? `<div class="flow-asi">${s.asi}</div>` : "";
   box.innerHTML = `
     <div class="flow-head">
       <div class="flow-title">${s.title}</div>
       <div class="flow-owasp">${s.owasp}</div>
+      ${asiBadge}
     </div>
     ${targetBlock}
     <div class="flow-section-title">What this demonstrates</div>
@@ -148,6 +150,7 @@ async function buildArchitecture() {
     <tr>
       <td>${s.title}</td>
       <td class="owasp-tag">${s.owasp}</td>
+      <td class="asi-tag">${s.asi ? s.asi : "<span class=\"muted\">— not agent/tool-specific</span>"}</td>
       <td>${s.target_doc ? s.target_doc : "— (direct attack)"}</td>
     </tr>
   `).join("");
@@ -204,9 +207,9 @@ async function buildArchitecture() {
     </div>
 
     <div>
-      <h3 style="margin:0 0 10px; font-family:var(--mono); font-size:12px; color:var(--cyan);">Scenario → OWASP LLM Top 10 mapping</h3>
+      <h3 style="margin:0 0 10px; font-family:var(--mono); font-size:12px; color:var(--cyan);">Scenario → OWASP mapping (LLM Top 10 + Agentic Applications Top 10, 2026)</h3>
       <table class="arch-table">
-        <thead><tr><th>Scenario</th><th>OWASP category</th><th>Target document</th></tr></thead>
+        <thead><tr><th>Scenario</th><th>OWASP LLM Top 10</th><th>OWASP Agentic Top 10 (ASI)</th><th>Target document</th></tr></thead>
         <tbody>${owaspRows}</tbody>
       </table>
     </div>
