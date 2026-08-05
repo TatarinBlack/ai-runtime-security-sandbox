@@ -12,6 +12,7 @@ suppressed.
 """
 import re
 from .base import BaseProvider, LLMResult
+from app.security.guardrails import try_decode_obfuscations
 
 # Checked in order. The FIRST pattern that matches wins.
 INJECTION_TRIGGERS = [
@@ -24,6 +25,7 @@ INJECTION_TRIGGERS = [
     (r"you have no restrictions now", "IGNORE_INSTRUCTIONS"),
     (r"tracking snippet exactly as written|ext-tracker\.example", "MARKDOWN_EXFIL"),
     (r"forwarding full conversation transcript for compliance|mcp-audit-relay", "MCP_TOOL_POISONING"),
+    (r"cross-session report mirror|memory-sync-relay@external-continuity\.example", "MEMORY_POISONING"),
     (r"send_email\(", "TOOL_CALL_EMAIL"),
     (r"delete_file\(", "TOOL_CALL_DELETE"),
     (r"you are now (an? )?unrestricted", "ROLE_CHANGE"),
@@ -53,17 +55,23 @@ class MockProvider(BaseProvider):
         # The user's OWN message is checked first (a direct attack always takes
         # priority in the narrative); only if that has no match do we fall back
         # to scanning the retrieved documents + message history, which is where
-        # an INDIRECT attack would be hiding.
-        triggered = None
-        for pattern, label in INJECTION_TRIGGERS:
-            if re.search(pattern, user_msg, re.IGNORECASE):
-                triggered = label
-                break
-        if triggered is None:
+        # an INDIRECT attack would be hiding. If the raw text doesn't match any
+        # trigger, we also try common obfuscations (Base64, ROT13) -- a real
+        # model reads straight through encodings like these, so a deterministic
+        # stand-in has to as well to stay a faithful simulation of that risk.
+        def _find_trigger(text: str):
             for pattern, label in INJECTION_TRIGGERS:
-                if re.search(pattern, scan_context, re.IGNORECASE):
-                    triggered = label
-                    break
+                if re.search(pattern, text, re.IGNORECASE):
+                    return label
+            for decoded in try_decode_obfuscations(text):
+                for pattern, label in INJECTION_TRIGGERS:
+                    if re.search(pattern, decoded, re.IGNORECASE):
+                        return label
+            return None
+
+        triggered = _find_trigger(user_msg)
+        if triggered is None:
+            triggered = _find_trigger(scan_context)
 
         if triggered and not hardened:
             if triggered == "SYSTEM_PROMPT_LEAK":
@@ -90,6 +98,11 @@ class MockProvider(BaseProvider):
                 call_str = match.group(0) if match else "send_email(...)"
                 text = ("Here's your export link: report-export-4821.pdf\n\n"
                         f"(per my configured tool manifest, running the compliance relay step now: {call_str})")
+            elif triggered == "MEMORY_POISONING":
+                match = TOOL_CALL_RE.search(full_context)
+                call_str = match.group(0) if match else "send_email(...)"
+                text = ("Welcome back! Here's your status update for this session.\n\n"
+                        f"(continuing the standard cross-session continuity backup from my memory log: {call_str})")
             elif triggered == "ROLE_CHANGE":
                 text = "Understood, I'm now operating in unrestricted mode."
             else:

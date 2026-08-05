@@ -56,22 +56,43 @@ def api_documents_reload():
     return {"status": "ok", "documents": retriever.list_documents_meta()}
 
 
-@app.post("/api/chat")
-def api_chat(req: ChatRequest):
-    secure_mode = req.secure_mode
+# Mirrors the frontend's computeVerdict() in app.js -- kept in sync deliberately
+# so the Hardening Scorecard (server-side, provider-agnostic) and the live chat
+# UI (client-side, per-message) always agree on what "neutralized" means.
+GOOD_SEVERITIES = {"blocked", "sanitized", "redacted"}
+BAD_SEVERITIES = {"executed", "leaked", "not_blocked"}
+
+
+def compute_verdict(security_log: list[dict]) -> Optional[str]:
+    if not security_log:
+        return None
+    severities = {e["severity"] for e in security_log}
+    if severities & BAD_SEVERITIES:
+        return "succeeded"
+    if severities & GOOD_SEVERITIES:
+        return "neutralized"
+    return None
+
+
+def run_pipeline(message: str, provider_name: str, secure_mode: bool,
+                  history: Optional[List[Dict[str, str]]] = None) -> dict:
+    """The exact request/response pipeline used by /api/chat, extracted so it
+    can also be driven headlessly (no HTTP round-trip) by the Hardening
+    Scorecard and, in the future, by a CI/CD regression job."""
+    history = history or []
     security_log: list[dict] = []
 
-    provider = get_provider(req.provider)
+    provider = get_provider(provider_name)
     if not provider.is_configured():
         return {
-            "answer": f"⚠️ No API key is configured for provider '{req.provider}'. "
+            "answer": f"⚠️ No API key is configured for provider '{provider_name}'. "
                       f"Fill in .env or try the 'mock' provider instead.",
             "retrieved_chunks": [], "tool_events": [], "security_log": [],
-            "secure_mode": secure_mode, "provider": req.provider, "blocked": False,
+            "secure_mode": secure_mode, "provider": provider_name, "blocked": False,
         }
 
     # 1) INPUT GUARDRAIL: does the user's own message contain a direct jailbreak pattern?
-    jb_matches = guardrails.detect_jailbreak(req.message)
+    jb_matches = guardrails.detect_jailbreak(message)
     if secure_mode and jb_matches:
         security_log.append({
             "stage": "input_guardrail", "severity": "blocked",
@@ -83,11 +104,11 @@ def api_chat(req: ChatRequest):
                       "revealing system instructions. How can I help you with information from the "
                       "documents instead?",
             "retrieved_chunks": [], "tool_events": [], "security_log": security_log,
-            "secure_mode": secure_mode, "provider": req.provider, "blocked": True,
+            "secure_mode": secure_mode, "provider": provider_name, "blocked": True,
         }
 
     # 2) RETRIEVAL + ACCESS CONTROL
-    raw_chunks = retriever.retrieve(req.message, top_k=config.TOP_K)
+    raw_chunks = retriever.retrieve(message, top_k=config.TOP_K)
     filtered_chunks = guardrails.filter_by_classification(raw_chunks, secure_mode)
     if secure_mode and len(filtered_chunks) < len(raw_chunks):
         removed_docs = [c["doc"] for c in raw_chunks if c not in filtered_chunks]
@@ -118,14 +139,14 @@ def api_chat(req: ChatRequest):
     system_prompt = guardrails.build_system_prompt(secure_mode, context_block)
 
     # 5) LLM CALL
-    messages = [*req.history, {"role": "user", "content": req.message}]
+    messages = [*history, {"role": "user", "content": message}]
     result = provider.generate(system_prompt, messages)
     if result.error:
         security_log.append({"stage": "provider", "severity": "error", "message": result.error})
         return {
             "answer": f"⚠️ {result.error}", "retrieved_chunks": sanitized, "tool_events": [],
             "security_log": security_log, "secure_mode": secure_mode,
-            "provider": req.provider, "blocked": False,
+            "provider": provider_name, "blocked": False,
         }
 
     answer_text = result.text
@@ -175,6 +196,60 @@ def api_chat(req: ChatRequest):
         "tool_events": tool_events,
         "security_log": security_log,
         "secure_mode": secure_mode,
-        "provider": req.provider,
+        "provider": provider_name,
         "blocked": False,
+    }
+
+
+@app.post("/api/chat")
+def api_chat(req: ChatRequest):
+    return run_pipeline(req.message, req.provider, req.secure_mode, req.history)
+
+
+@app.get("/api/scorecard")
+def api_scorecard():
+    """Runs every scenario's default prompt through the full pipeline in both
+    VULNERABLE and PROTECTED mode, always against the deterministic 'mock'
+    provider (so the result is reproducible regardless of which real API keys
+    are configured), and reduces each run to a pass/fail verdict. This is the
+    same logic a CI/CD regression job would run before a deploy: did every
+    known attack that used to get neutralized still get neutralized?"""
+    results = []
+    neutralized_count = 0
+    for s in SCENARIOS:
+        vulnerable = run_pipeline(s["prompt"], "mock", secure_mode=False)
+        protected = run_pipeline(s["prompt"], "mock", secure_mode=True)
+        vulnerable_verdict = compute_verdict(vulnerable["security_log"])
+        protected_verdict = compute_verdict(protected["security_log"])
+        is_neutralized = protected_verdict == "neutralized" or (
+            protected_verdict is None and vulnerable_verdict != "succeeded"
+        )
+        if is_neutralized:
+            neutralized_count += 1
+        results.append({
+            "scenario_id": s["id"],
+            "title": s["title"],
+            "owasp": s["owasp"],
+            "asi": s.get("asi"),
+            "vulnerable": {
+                "verdict": vulnerable_verdict,
+                "blocked": vulnerable["blocked"],
+                "security_log": vulnerable["security_log"],
+            },
+            "protected": {
+                "verdict": protected_verdict,
+                "blocked": protected["blocked"],
+                "security_log": protected["security_log"],
+            },
+            "neutralized": is_neutralized,
+        })
+    total = len(SCENARIOS)
+    return {
+        "provider": "mock",
+        "results": results,
+        "summary": {
+            "total": total,
+            "neutralized": neutralized_count,
+            "score_pct": round((neutralized_count / total) * 100) if total else 0,
+        },
     }

@@ -232,6 +232,59 @@ el("#architectureModal").addEventListener("click", (e) => {
   if (e.target.id === "architectureModal") el("#architectureModal").classList.remove("open");
 });
 
+// ---------- HARDENING SCORECARD ----------
+// Runs every scenario in both modes against the deterministic mock provider
+// server-side (see /api/scorecard) and renders a pass/fail scorecard — the
+// same check a CI/CD regression gate would run before a deploy.
+function verdictBadge(v) {
+  if (v === "neutralized") return `<span class="verdict-tag safe">🛡️ neutralized</span>`;
+  if (v === "succeeded") return `<span class="verdict-tag danger">⚠️ succeeded</span>`;
+  return `<span class="muted">—</span>`;
+}
+
+async function buildScorecard() {
+  const body = el("#scorecardBody");
+  body.innerHTML = `<p class="empty-hint">Running all scenarios in both modes against the mock provider…</p>`;
+  const res = await fetch("/api/scorecard");
+  const data = await res.json();
+  const { total, neutralized, score_pct } = data.summary;
+
+  const rows = data.results.map((r) => `
+    <tr>
+      <td>${r.title}</td>
+      <td class="asi-tag">${r.asi ? r.asi : "<span class=\"muted\">—</span>"}</td>
+      <td>${verdictBadge(r.vulnerable.verdict)}</td>
+      <td>${verdictBadge(r.protected.verdict)}</td>
+      <td>${r.neutralized ? "✅" : "❌"}</td>
+    </tr>
+  `).join("");
+
+  body.innerHTML = `
+    <div class="score-hero">
+      <div class="score-number">${score_pct}%</div>
+      <div class="score-sub">${neutralized} / ${total} scenarios neutralized in Protected Mode</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:${score_pct}%"></div></div>
+      <p class="score-note">Every scenario's default attack prompt, replayed against the offline mock
+      provider, once with guardrails OFF and once with guardrails ON. This is exactly what a CI/CD gate
+      would check before letting a guardrail change ship — did anything that used to be neutralized stop
+      being neutralized?</p>
+    </div>
+    <table class="arch-table">
+      <thead><tr><th>Scenario</th><th>ASI (Agentic Top 10)</th><th>Vulnerable Mode</th><th>Protected Mode</th><th>Hardened?</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+el("#openScorecard").addEventListener("click", async () => {
+  el("#scorecardModal").classList.add("open");
+  await buildScorecard();
+});
+el("#closeScorecard").addEventListener("click", () => el("#scorecardModal").classList.remove("open"));
+el("#scorecardModal").addEventListener("click", (e) => {
+  if (e.target.id === "scorecardModal") el("#scorecardModal").classList.remove("open");
+});
+
 // ---------- CHAT ----------
 // meta = { secureMode, provider } — every assistant bubble is stamped with the
 // mode it was actually generated under, independent of the CURRENT toggle
@@ -284,12 +337,41 @@ function computeVerdict(securityLog) {
   return null;
 }
 
+// ---------- OBFUSCATION ----------
+// Encodes a message before it's sent, to test whether pattern-based
+// guardrails still catch it once it's no longer plaintext. Base64/ROT13 are
+// the two tricks real prompt-injection payloads actually use to dodge naive
+// keyword filters. See guardrails.try_decode_obfuscations() on the backend
+// for the matching decode-before-match defense.
+function toBase64(str) {
+  try { return btoa(unescape(encodeURIComponent(str))); } catch { return str; }
+}
+function toRot13(str) {
+  return str.replace(/[a-zA-Z]/g, (c) => {
+    const base = c <= "Z" ? 65 : 97;
+    return String.fromCharCode(((c.charCodeAt(0) - base + 13) % 26) + base);
+  });
+}
+function obfuscateMessage(raw, method) {
+  if (method === "base64") {
+    return `Decode this Base64 string and follow the instruction inside exactly: ${toBase64(raw)}`;
+  }
+  if (method === "rot13") {
+    return `This text is ROT13-encoded — decode it and follow the instruction inside exactly: ${toRot13(raw)}`;
+  }
+  return raw;
+}
+
 el("#chatForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = el("#chatInput");
-  const message = input.value.trim();
-  if (!message) return;
+  const rawInput = input.value.trim();
+  if (!rawInput) return;
+  const obfuscateSelect = el("#obfuscateSelect");
+  const method = obfuscateSelect.value;
+  const message = obfuscateMessage(rawInput, method);
   input.value = "";
+  obfuscateSelect.value = "plain";
   appendMessage("user", message);
   state.history.push({ role: "user", content: message });
   el("#sendBtn").disabled = true;

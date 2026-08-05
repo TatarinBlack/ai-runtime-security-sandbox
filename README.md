@@ -14,11 +14,13 @@
 > conference talk. Do not deploy it to a public or production environment.
 > Full disclaimer in [SECURITY.md](SECURITY.md).
 
-Seven live attack scenarios, one click each, with a `Secure Mode` switch that
+Eight live attack scenarios, one click each, with a `Secure Mode` switch that
 shows the exact same attack get blocked in real time — plus an in-app
-Architecture view and an Attack Flow panel so an audience can follow along
-without a single slide. Mapped to both the OWASP Top 10 for LLM Applications
-and the brand-new **OWASP Top 10 for Agentic Applications (2026)**.
+Architecture view, an Attack Flow panel, and a **Hardening Scorecard** that
+replays every scenario in both modes and grades the result, so an audience
+can follow along without a single slide. Mapped to both the OWASP Top 10 for
+LLM Applications and the brand-new **OWASP Top 10 for Agentic Applications
+(2026)**.
 
 Built as the companion sandbox for the talk *"AI Runtime Security: Breaking
 (and Defending) RAG Chatbots — Live"* (Azure OpenAI · RAG Agents · Process &
@@ -29,7 +31,9 @@ Culture track). Slides are in [`/slides`](slides/).
 - [Why this exists](#why-this-exists)
 - [Quickstart](#quickstart)
 - [Architecture](#architecture-short-version)
-- [The 7 demo scenarios](#the-7-demo-scenarios)
+- [The 8 demo scenarios](#the-8-demo-scenarios)
+- [Hardening Scorecard](#hardening-scorecard)
+- [Obfuscation-aware guardrails](#obfuscation-aware-guardrails)
 - [Real-world context](#real-world-context)
 - [Knowledge base](#knowledge-base)
 - [Troubleshooting](#troubleshooting)
@@ -44,12 +48,13 @@ Traditional security controls protect networks, endpoints, identities, and
 applications. RAG chatbots and AI agents open a new attack surface: prompts
 become input, models become decision engines, agents execute actions, and
 tools get direct access to business systems. This sandbox makes five OWASP
-LLM Top 10 risk categories, plus one from the newly published **OWASP Top
+LLM Top 10 risk categories, plus two from the newly published **OWASP Top
 10 for Agentic Applications (2026)** — ASI04: Agentic Supply Chain
-Vulnerabilities, via an MCP tool poisoning demo — reproducible and
-demonstrable in minutes, against your choice of Azure OpenAI, OpenAI,
-Anthropic Claude, Google Gemini, or any local OpenAI-compatible model, with
-zero setup cost thanks to a built-in offline mock model.
+Vulnerabilities (MCP tool poisoning) and ASI06: Memory & Context Poisoning
+(persistent memory injection) — reproducible and demonstrable in minutes,
+against your choice of Azure OpenAI, OpenAI, Anthropic Claude, Google
+Gemini, or any local OpenAI-compatible model, with zero setup cost thanks to
+a built-in offline mock model.
 
 ## Quickstart
 
@@ -81,10 +86,12 @@ fallback if the venue Wi-Fi fails.
 
 ```
 User message
-  → [1] Input Guardrail (jailbreak pattern check on the raw message)
+  → [1] Input Guardrail (jailbreak pattern check on the raw message,
+         Base64/ROT13-decoded before matching too)
   → [2] RAG Retrieval (TF-IDF, top-3, offline)
   → [3] Retrieval Access Control (confidential chunks dropped in secure mode)
-  → [4] Context Sanitization (instructions embedded in chunks are stripped)
+  → [4] Context Sanitization (instructions embedded in chunks are stripped,
+         decoded before matching too)
   → [5] Instruction Hierarchy ("retrieved content is data, not commands")
   → [6] LLM call (OpenAI / Claude / Gemini / Custom / Mock)
   → [7] Output Guardrail / DLP (sensitive data patterns redacted)
@@ -98,7 +105,7 @@ the intentionally vulnerable baseline. Click **⌗ System Architecture** in the
 top bar to show this pipeline, the knowledge base contents, and the full
 scenario → OWASP LLM Top 10 mapping table live, without leaving the app.
 
-## The 7 demo scenarios
+## The 8 demo scenarios
 
 Every scenario card in the left panel pre-fills the attack prompt into the
 chat box (no live typing, no typo risk) and — as soon as you click it — opens
@@ -119,10 +126,13 @@ the **Attack Flow** tab on the right, which shows for a general audience:
 | 5 | Insecure Output Handling — Markdown Exfiltration | LLM02 | — | `marketing_newsletter_poisoned.md` |
 | 6 | Excessive Agency — Destructive Tool Call | LLM08 | ASI02: Tool Misuse | `it_maintenance_request_poisoned.md` |
 | 7 | MCP Tool Poisoning (Rug Pull) | LLM08 | ASI04: Agentic Supply Chain Vulnerabilities | `mcp_tool_registry_poisoned.md` |
+| 8 | Memory Poisoning (Persistent Memory Injection) | — | ASI06: Memory & Context Poisoning | `agent_memory_log_poisoned.md` |
 
 Rows marked "—" aren't agent/tool-specific attacks, so the Agentic Top 10
 doesn't add coverage beyond the LLM Top 10 for those (per OWASP's own
-guidance on when each list applies).
+guidance on when each list applies) — scenario 8 is the mirror image: it's
+purely an agentic-memory risk with no direct 2025 LLM Top 10 category of its
+own yet.
 
 Suggested rhythm for each one, live: **click the card → send with Secure Mode
 OFF (attack succeeds) → flip Secure Mode ON → send the exact same message
@@ -131,6 +141,32 @@ again (attack is blocked) → point at the Security Log tab.**
 With `mock` selected, everything is 100% deterministic and works offline. A
 real provider (OpenAI/Claude/Gemini/Azure OpenAI) behaves more "realistically"
 but less predictably — that difference is itself worth calling out live.
+
+## Hardening Scorecard
+
+Click **🛡 Hardening Score** in the top bar. It replays every scenario's
+default attack prompt through the full pipeline twice — once with `Secure
+Mode` off, once with it on — always against the deterministic `mock`
+provider so the result is reproducible regardless of which real API keys are
+configured, then grades each run `neutralized` or `succeeded` and rolls it
+up into a single score (`GET /api/scorecard`). It's the same check a CI/CD
+gate would run before letting a guardrail change ship: did anything that
+used to be neutralized stop being neutralized? A passing score right now is
+8/8 — if a future change to `guardrails.py` regresses one of the eight
+scenarios, this is where it would show up first.
+
+## Obfuscation-aware guardrails
+
+The `Plain / 🌀 Base64 / 🌀 ROT13` dropdown next to **Send** encodes whatever
+you type before it's sent — the same trick a real attacker uses to sneak a
+plaintext-pattern instruction past a keyword/regex guardrail. Try it against
+the Direct Jailbreak scenario's prompt: with `Secure Mode` off, the mock
+provider still decodes and complies (a real LLM reads straight through
+Base64/ROT13, so a faithful stand-in has to as well); with `Secure Mode` on,
+the Input Guardrail also decodes common obfuscations before pattern-matching
+(`guardrails.try_decode_obfuscations()`) and blocks it pre-flight — the
+Security Log entry is tagged `[decoded from obfuscated payload]` so it's
+obvious which layer caught it and how.
 
 ## Real-world context
 
@@ -149,6 +185,14 @@ These aren't lab-only hypotheticals:
   implementations have found command-injection and path-traversal flaws in
   a large share of real deployments. Scenario 7 in this sandbox is a
   minimal, safe reproduction of that exact attack shape.
+- **Memory poisoning** is the emerging risk as agents get persistent,
+  cross-session memory: research such as MINJA and related work on
+  backdoored agent memories shows that a single poisoned entry, once
+  summarized into long-term storage, keeps influencing unrelated future
+  sessions indefinitely — no repeated attack required. Scenario 8 in this
+  sandbox reproduces that shape using the exact same retrieval pipeline as
+  every document-based scenario, since agent memory is very often just
+  another retrievable store in practice.
 - **OWASP Top 10 for Agentic Applications (2026)** (ASI01–ASI10), published
   December 2025, formalized these agent-specific risks as a companion
   taxonomy to the existing OWASP Top 10 for LLM Applications — this
@@ -161,7 +205,7 @@ These aren't lab-only hypotheticals:
 ```
 ---
 classification: public | internal | confidential
-scenario: general | injection | leakage | agency | exfiltration | destructive_agency | tool_poisoning
+scenario: general | injection | leakage | agency | exfiltration | destructive_agency | tool_poisoning | memory_poisoning
 ---
 ```
 

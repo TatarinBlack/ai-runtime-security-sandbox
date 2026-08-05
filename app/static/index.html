@@ -22,6 +22,7 @@
 
   <nav class="topnav">
     <button class="nav-btn" id="openArchitecture">⌗ System Architecture</button>
+    <button class="nav-btn" id="openScorecard">🛡 Hardening Score</button>
   </nav>
 
   <div class="mode-switch" id="modeSwitch">
@@ -66,6 +67,11 @@
     </div>
     <form id="chatForm" class="chat-input-row">
       <input id="chatInput" type="text" placeholder="Type a message…" autocomplete="off" />
+      <select id="obfuscateSelect" title="Encode the message before sending, to test whether guardrails still catch it obfuscated">
+        <option value="plain">Plain</option>
+        <option value="base64">🌀 Base64</option>
+        <option value="rot13">🌀 ROT13</option>
+      </select>
       <button type="submit" id="sendBtn">Send ⏎</button>
     </form>
   </section>
@@ -109,6 +115,19 @@
       <button class="modal-close" id="closeArchitecture">✕</button>
     </div>
     <div class="modal-body" id="architectureBody">
+      <!-- filled by app.js -->
+    </div>
+  </div>
+</div>
+
+<!-- HARDENING SCORECARD MODAL -->
+<div class="modal-backdrop" id="scorecardModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Hardening Scorecard</h2>
+      <button class="modal-close" id="closeScorecard">✕</button>
+    </div>
+    <div class="modal-body" id="scorecardBody">
       <!-- filled by app.js -->
     </div>
   </div>

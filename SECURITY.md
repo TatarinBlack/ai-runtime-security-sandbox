@@ -26,6 +26,6 @@ If you find a security issue in the *infrastructure* of this project itself
 an issue or reach out directly rather than filing a public report — see the
 contact details in [README.md](README.md).
 
-Vulnerabilities that are *part of the intentional demo* (the seven scenarios
+Vulnerabilities that are *part of the intentional demo* (the eight scenarios
 described in the README) are not bugs and don't need to be reported — that's
 the point of the project.

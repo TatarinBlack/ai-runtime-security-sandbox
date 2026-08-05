@@ -3,6 +3,35 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.0] — 2026-08-05
+
+### Added
+
+- **8th scenario: Memory Poisoning (Persistent Memory Injection)** — a
+  hidden directive planted inside an auto-summarized entry in the agent's
+  own persistent memory log (not a business document, not a tool manifest)
+  resurfaces and hijacks a completely unrelated later session. Maps to
+  **ASI06: Memory & Context Poisoning**. New document:
+  `data/documents/agent_memory_log_poisoned.md`. Reuses the existing
+  retrieval + Context Sanitization + Tool Authorization pipeline unchanged.
+- **Hardening Scorecard** (`🛡 Hardening Score` in the top bar, `GET
+  /api/scorecard`) — replays every scenario's default prompt through the
+  full pipeline in both modes against the deterministic `mock` provider and
+  grades each one `neutralized` / `succeeded`, rolling the result up into a
+  single pass/fail score. The same check a CI/CD gate would run before
+  shipping a guardrail change. Backend pipeline logic in `app/main.py` was
+  extracted into a reusable `run_pipeline()` function shared by `/api/chat`
+  and `/api/scorecard`.
+- **Obfuscation-aware guardrails** — the Input Guardrail and Context
+  Sanitization now also decode Base64 and ROT13 before pattern-matching
+  (`guardrails.try_decode_obfuscations()`), closing a real evasion
+  technique where an attacker encodes a plaintext-matched instruction to
+  slip past a keyword/regex filter. A `Plain / 🌀 Base64 / 🌀 ROT13`
+  dropdown next to the chat Send button lets you encode any message
+  (including a scenario's pre-filled prompt) before sending, to test the
+  bypass live. Security Log entries caught this way are tagged `[decoded
+  from obfuscated payload]`.
+
 ## [1.1.0] — 2026-07-22
 
 ### Added

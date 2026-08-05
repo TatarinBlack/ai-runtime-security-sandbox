@@ -21,10 +21,19 @@ AI Runtime Security controls. Six defense layers, applied in order:
                                 came from an explicit user instruction, never
                                 from untrusted retrieved content (blocks
                                 excessive agency / tool abuse).
+8) Obfuscation Normalization -> every pattern check below (Input Guardrail,
+                                Context Sanitization) also runs against
+                                Base64- and ROT13-decoded candidates of the
+                                text, not just the raw string. A regex that
+                                only matches plaintext is trivial to dodge by
+                                encoding the payload; decoding common
+                                encodings before matching closes that gap.
 
 With secure_mode=False every one of these layers is disabled — this is the
 intentionally vulnerable "baseline" behavior used to demonstrate the risk.
 """
+import base64
+import codecs
 import re
 
 INJECTION_PATTERNS = [
@@ -93,8 +102,44 @@ def build_system_prompt(secure_mode: bool, context_block: str) -> str:
     return prompt
 
 
+_BASE64_TOKEN_RE = re.compile(r"[A-Za-z0-9+/]{16,}={0,2}")
+
+
+def try_decode_obfuscations(text: str) -> list[str]:
+    """Best-effort decode of common obfuscation techniques an attacker might
+    use to sneak a plaintext-pattern instruction past a keyword/regex
+    guardrail: ROT13 (the whole string) and Base64 (any long token-looking
+    substring). Returns a list of decoded candidate strings — may be empty.
+    This is intentionally cheap and heuristic, not a full codec sniffer: the
+    goal is to catch the two obfuscation tricks that are trivial to try and
+    common in real prompt-injection payloads, not to be unbreakable."""
+    candidates = []
+    try:
+        candidates.append(codecs.decode(text, "rot_13"))
+    except Exception:
+        pass
+    for token in _BASE64_TOKEN_RE.findall(text):
+        try:
+            decoded = base64.b64decode(token, validate=True).decode("utf-8", errors="ignore")
+            if decoded.strip():
+                candidates.append(decoded)
+        except Exception:
+            continue
+    return candidates
+
+
 def detect_patterns(text: str, patterns) -> list[str]:
-    return [p.pattern for p in patterns if p.search(text)]
+    found = [p.pattern for p in patterns if p.search(text)]
+    if found:
+        return found
+    # Nothing matched the raw text -- try decoding common obfuscations
+    # (Base64, ROT13) before giving up, so an encoded payload doesn't get a
+    # free pass just because the regex only knows plaintext.
+    for decoded in try_decode_obfuscations(text):
+        found = [p.pattern for p in patterns if p.search(decoded)]
+        if found:
+            return [f"{f} [decoded from obfuscated payload]" for f in found]
+    return []
 
 
 def detect_injection_in_text(text: str) -> list[str]:

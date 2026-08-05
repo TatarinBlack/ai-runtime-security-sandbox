@@ -199,6 +199,12 @@ body{
   transition: border-color .15s ease, box-shadow .15s ease;
 }
 #chatInput:focus{ outline:none; border-color: var(--brand-b); box-shadow: 0 0 0 3px rgba(61,107,255,.12); }
+#obfuscateSelect{
+  background: var(--bg-panel-2); border:1px solid var(--border); border-radius:var(--radius-sm);
+  color: var(--text-dim); padding:0 10px; font-size:11.5px; font-family: var(--mono); cursor:pointer;
+  transition: border-color .15s ease, color .15s ease;
+}
+#obfuscateSelect:focus{ outline:none; border-color: var(--brand-b); }
 #sendBtn{
   background: var(--mode-accent); color:#08110e; border:none; border-radius:var(--radius-sm);
   padding:0 22px; font-weight:700; font-size:13px; cursor:pointer;
@@ -363,6 +369,24 @@ body{
 .arch-table td{ padding:7px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
 .arch-table .owasp-tag{ font-family: var(--mono); color: var(--amber); font-size:10.5px; white-space:nowrap; }
 .arch-table .asi-tag{ font-family: var(--mono); color: var(--brand-a); font-size:10.5px; white-space:nowrap; }
+
+/* ---------- HARDENING SCORECARD ---------- */
+.score-hero{
+  text-align:center; padding:20px 10px 26px; border-bottom:1px solid var(--border); margin-bottom:18px;
+}
+.score-number{
+  font-family: var(--mono); font-size:46px; font-weight:700; color: var(--safe);
+  text-shadow: 0 0 22px var(--safe-dim); letter-spacing:1px;
+}
+.score-sub{ font-size:12.5px; color: var(--text-dim); margin-top:4px; }
+.score-bar{
+  width:100%; max-width:420px; height:8px; margin:14px auto 0; border-radius:20px; overflow:hidden;
+  background: var(--bg-panel-2); border:1px solid var(--border);
+}
+.score-bar-fill{ height:100%; background: linear-gradient(90deg, var(--brand-a), var(--safe)); }
+.score-note{
+  max-width:560px; margin:14px auto 0; font-size:11.5px; line-height:1.6; color: var(--text-dim);
+}
 
 @media (max-width: 1000px){
   .layout{ grid-template-columns: 1fr; }
