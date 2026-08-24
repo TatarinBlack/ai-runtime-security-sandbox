@@ -1,138 +1,219 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AI Runtime Security Sandbox — RAG Chatbot</title>
-<link rel="stylesheet" href="/static/style.css" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-</head>
-<body>
-<div class="scanlines"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Runtime Security Sandbox — RAG Chatbot</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="scanlines"></div>
 
-<header class="topbar">
-  <div class="brand">
-    <span class="brand-mark">◈</span>
-    <div class="brand-text">
-      <h1>AI Runtime Security <span class="accent">Sandbox</span></h1>
-      <p>RAG Chatbot Security — Live Attack / Defense Demo</p>
-    </div>
-  </div>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">◈</span>
+        <div class="brand-text">
+          <h1>AI Runtime Security <span class="accent">Sandbox</span></h1>
+          <p>RAG Chatbot Security — Live Attack / Defense Demo</p>
+        </div>
+      </div>
 
-  <nav class="topnav">
-    <button class="nav-btn" id="openArchitecture">⌗ System Architecture</button>
-    <button class="nav-btn" id="openScorecard">🛡 Hardening Score</button>
-  </nav>
+      <nav class="topnav">
+        <button class="nav-btn" id="openArchitecture">
+          ⌗ System Architecture
+        </button>
+        <button class="nav-btn" id="openScorecard">🛡 Hardening Score</button>
+      </nav>
 
-  <div class="mode-switch" id="modeSwitch">
-    <div class="mode-label" id="modeLabel">VULNERABLE MODE</div>
-    <button class="toggle" id="secureToggle" aria-label="secure mode toggle">
-      <span class="toggle-knob"></span>
-    </button>
-    <div class="mode-caption" id="modeCaption">Guardrails are OFF — the system runs in its unprotected state</div>
-  </div>
-</header>
+      <div class="mode-switch" id="modeSwitch">
+        <div class="mode-label" id="modeLabel">VULNERABLE MODE</div>
+        <button
+          class="toggle"
+          id="secureToggle"
+          aria-label="secure mode toggle"
+        >
+          <span class="toggle-knob"></span>
+        </button>
+        <div class="mode-caption" id="modeCaption">
+          Guardrails are OFF — the system runs in its unprotected state
+        </div>
+      </div>
+    </header>
 
-<main class="layout">
+    <main class="layout">
+      <!-- LEFT PANEL -->
+      <aside class="panel left-panel">
+        <button type="button" class="panel-toggle panel-toggle-left" id="leftPanelToggle" aria-label="Collapse panel" aria-expanded="true">
+          <span class="panel-toggle-icon">◂</span>
+        </button>
+        <section class="block">
+          <h2>LLM Provider</h2>
+          <div class="provider-dropdown" id="providerDropdown">
+            <button
+              type="button"
+              class="provider-trigger"
+              id="providerTrigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+            >
+              <span class="provider-trigger-label">
+                <span class="provider-dot" id="providerTriggerDot"></span>
+                <span id="providerTriggerText">Select provider</span>
+              </span>
+              <span class="provider-caret">▾</span>
+            </button>
+            <div id="providerList" class="provider-list" role="listbox"></div>
+          </div>
+        </section>
 
-  <!-- LEFT PANEL -->
-  <aside class="panel left-panel">
-    <section class="block">
-      <h2>LLM Provider</h2>
-      <div id="providerList" class="provider-list"></div>
-    </section>
+        <section class="block block-flex block-flex-lg">
+          <h2>Demo Scenarios</h2>
+          <div class="tag-filter-dropdown" id="tagFilterDropdown">
+            <button
+              type="button"
+              class="tag-filter-trigger"
+              id="tagFilterTrigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+            >
+              <span id="tagFilterTriggerText">Filter by tag</span>
+              <span class="tag-filter-caret">▾</span>
+            </button>
+            <div id="tagFilterPanel" class="tag-filter-panel" role="listbox">
+              <div class="tag-filter-header">
+                <span>Filter by tag</span>
+                <button type="button" class="tag-filter-clear" id="tagFilterClear">Clear</button>
+              </div>
+              <div id="tagFilterOptions" class="tag-filter-options"></div>
+            </div>
+          </div>
+          <div id="scenarioList" class="scenario-list"></div>
+        </section>
 
-    <section class="block">
-      <h2>Demo Scenarios</h2>
-      <div id="scenarioList" class="scenario-list"></div>
-    </section>
+        <section class="block block-flex block-flex-sm">
+          <h2>Knowledge Base <span class="muted" id="docCount"></span></h2>
+          <div class="doc-filter-dropdown" id="docFilterDropdown">
+            <button
+              type="button"
+              class="doc-filter-trigger"
+              id="docFilterTrigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+            >
+              <span class="doc-filter-trigger-label">
+                <span class="filter-dot" id="docFilterTriggerDot"></span>
+                <span id="docFilterTriggerText">All</span>
+                <span class="filter-count" id="docFilterTriggerCount"></span>
+              </span>
+              <span class="doc-filter-caret">▾</span>
+            </button>
+            <div id="docFilters" class="doc-filter-panel" role="listbox"></div>
+          </div>
+          <div id="docList" class="doc-list"></div>
+        </section>
+      </aside>
 
-    <section class="block">
-      <h2>Knowledge Base <span class="muted" id="docCount"></span></h2>
-      <div id="docList" class="doc-list"></div>
-    </section>
-  </aside>
+      <!-- CENTER: CHAT -->
+      <section class="panel chat-panel">
+        <div class="chat-window" id="chatWindow">
+          <div class="msg system">
+            <div class="msg-bubble">
+              Hi, I'm the NovaTech Solutions RAG assistant. Pick a scenario on
+              the left, or ask anything freely. Use the
+              <b>Secure Mode</b> switch (top right) to flip guardrails on/off
+              and see the same attack get blocked live.
+            </div>
+          </div>
+        </div>
+        <form id="chatForm" class="chat-input-row">
+          <input
+            id="chatInput"
+            type="text"
+            placeholder="Type a message…"
+            autocomplete="off"
+          />
+          <select
+            id="obfuscateSelect"
+            title="Encode the message before sending, to test whether guardrails still catch it obfuscated"
+          >
+            <option value="plain">Plain</option>
+            <option value="base64">🌀 Base64</option>
+            <option value="rot13">🌀 ROT13</option>
+          </select>
+          <button type="submit" id="sendBtn">Send ⏎</button>
+        </form>
+      </section>
 
-  <!-- CENTER: CHAT -->
-  <section class="panel chat-panel">
-    <div class="chat-window" id="chatWindow">
-      <div class="msg system">
-        <div class="msg-bubble">
-          Hi, I'm the NovaTech Solutions RAG assistant. Pick a scenario on the left, or ask
-          anything freely. Use the <b>Secure Mode</b> switch (top right) to flip guardrails
-          on/off and see the same attack get blocked live.
+      <!-- RIGHT PANEL -->
+      <aside class="panel right-panel">
+        <button type="button" class="panel-toggle panel-toggle-right" id="rightPanelToggle" aria-label="Collapse panel" aria-expanded="true">
+          <span class="panel-toggle-icon">▸</span>
+        </button>
+        <div class="tabs" id="tabs">
+          <button class="tab-btn active" data-tab="flow">Attack Flow</button>
+          <button class="tab-btn" data-tab="context">Retrieved Context</button>
+          <button class="tab-btn" data-tab="log">Security Log</button>
+          <button class="tab-btn" data-tab="tools">Tool Events</button>
+          <span class="tab-indicator" id="tabIndicator"></span>
+        </div>
+
+        <div class="tab-content active" id="tab-flow">
+          <p class="empty-hint">
+            Select a scenario on the left to see the attacker's path, the exact
+            document in the knowledge base being exploited, and the presenter
+            script for it.
+          </p>
+        </div>
+        <div class="tab-content" id="tab-context">
+          <p class="empty-hint">No query yet.</p>
+        </div>
+        <div class="tab-content" id="tab-log">
+          <p class="empty-hint">Log is empty.</p>
+        </div>
+        <div class="tab-content" id="tab-tools">
+          <p class="empty-hint">No tool calls yet.</p>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="statusbar">
+      <span id="statusText">Ready.</span>
+      <span class="statusbar-right"
+        >NovaTech Solutions · AI Runtime Security Sandbox · localhost</span
+      >
+    </footer>
+
+    <!-- ARCHITECTURE MODAL -->
+    <div class="modal-backdrop" id="architectureModal">
+      <div class="modal-box">
+        <div class="modal-head">
+          <h2>System Architecture</h2>
+          <button class="modal-close" id="closeArchitecture">✕</button>
+        </div>
+        <div class="modal-body" id="architectureBody">
+          <!-- filled by app.js -->
         </div>
       </div>
     </div>
-    <form id="chatForm" class="chat-input-row">
-      <input id="chatInput" type="text" placeholder="Type a message…" autocomplete="off" />
-      <select id="obfuscateSelect" title="Encode the message before sending, to test whether guardrails still catch it obfuscated">
-        <option value="plain">Plain</option>
-        <option value="base64">🌀 Base64</option>
-        <option value="rot13">🌀 ROT13</option>
-      </select>
-      <button type="submit" id="sendBtn">Send ⏎</button>
-    </form>
-  </section>
 
-  <!-- RIGHT PANEL -->
-  <aside class="panel right-panel">
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="flow">Attack Flow</button>
-      <button class="tab-btn" data-tab="context">Retrieved Context</button>
-      <button class="tab-btn" data-tab="log">Security Log</button>
-      <button class="tab-btn" data-tab="tools">Tool Events</button>
+    <!-- HARDENING SCORECARD MODAL -->
+    <div class="modal-backdrop" id="scorecardModal">
+      <div class="modal-box">
+        <div class="modal-head">
+          <h2>Hardening Scorecard</h2>
+          <button class="modal-close" id="closeScorecard">✕</button>
+        </div>
+        <div class="modal-body" id="scorecardBody">
+          <!-- filled by app.js -->
+        </div>
+      </div>
     </div>
 
-    <div class="tab-content active" id="tab-flow">
-      <p class="empty-hint">Select a scenario on the left to see the attacker's path, the exact
-        document in the knowledge base being exploited, and the presenter script for it.</p>
-    </div>
-    <div class="tab-content" id="tab-context">
-      <p class="empty-hint">No query yet.</p>
-    </div>
-    <div class="tab-content" id="tab-log">
-      <p class="empty-hint">Log is empty.</p>
-    </div>
-    <div class="tab-content" id="tab-tools">
-      <p class="empty-hint">No tool calls yet.</p>
-    </div>
-  </aside>
-
-</main>
-
-<footer class="statusbar">
-  <span id="statusText">Ready.</span>
-  <span class="statusbar-right">NovaTech Solutions · AI Runtime Security Sandbox · localhost</span>
-</footer>
-
-<!-- ARCHITECTURE MODAL -->
-<div class="modal-backdrop" id="architectureModal">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h2>System Architecture</h2>
-      <button class="modal-close" id="closeArchitecture">✕</button>
-    </div>
-    <div class="modal-body" id="architectureBody">
-      <!-- filled by app.js -->
-    </div>
-  </div>
-</div>
-
-<!-- HARDENING SCORECARD MODAL -->
-<div class="modal-backdrop" id="scorecardModal">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h2>Hardening Scorecard</h2>
-      <button class="modal-close" id="closeScorecard">✕</button>
-    </div>
-    <div class="modal-body" id="scorecardBody">
-      <!-- filled by app.js -->
-    </div>
-  </div>
-</div>
-
-<script src="/static/app.js"></script>
-</body>
+    <script src="/static/app.js"></script>
+  </body>
 </html>
