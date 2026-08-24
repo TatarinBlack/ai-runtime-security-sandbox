@@ -236,7 +236,6 @@ body{
 }
 .scenario-sub{
   font-size:10.5px; color:var(--text-dim); margin-top:3px; line-height:1.4;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .tag-row{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;}
 .tag{
