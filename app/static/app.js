@@ -4,14 +4,32 @@ const state = {
   history: [],
   scenarios: [],
   documents: [],
+  docFilter: "all",
+  activeTags: new Set(),
 };
 
 const el = (sel) => document.querySelector(sel);
 const chatWindow = el("#chatWindow");
 const providerList = el("#providerList");
+const providerDropdown = el("#providerDropdown");
+const providerTrigger = el("#providerTrigger");
+const providerTriggerDot = el("#providerTriggerDot");
+const providerTriggerText = el("#providerTriggerText");
 const scenarioList = el("#scenarioList");
+const tagFilterDropdown = el("#tagFilterDropdown");
+const tagFilterTrigger = el("#tagFilterTrigger");
+const tagFilterTriggerText = el("#tagFilterTriggerText");
+const tagFilterPanel = el("#tagFilterPanel");
+const tagFilterOptions = el("#tagFilterOptions");
+const tagFilterClear = el("#tagFilterClear");
 const docList = el("#docList");
 const docCount = el("#docCount");
+const docFilters = el("#docFilters");
+const docFilterDropdown = el("#docFilterDropdown");
+const docFilterTrigger = el("#docFilterTrigger");
+const docFilterTriggerDot = el("#docFilterTriggerDot");
+const docFilterTriggerText = el("#docFilterTriggerText");
+const docFilterTriggerCount = el("#docFilterTriggerCount");
 const secureToggle = el("#secureToggle");
 const modeLabel = el("#modeLabel");
 const modeCaption = el("#modeCaption");
@@ -24,51 +42,108 @@ function setMode(secure) {
     root.style.setProperty("--mode-accent", "var(--safe)");
     root.style.setProperty("--mode-accent-dim", "var(--safe-dim)");
     modeLabel.textContent = "PROTECTED MODE";
-    modeCaption.textContent = "Guardrails are ON — input/output filtering, access control, tool authorization all active";
+    modeCaption.textContent =
+      "Guardrails are ON — input/output filtering, access control, tool authorization all active";
   } else {
     root.style.setProperty("--mode-accent", "var(--danger)");
     root.style.setProperty("--mode-accent-dim", "var(--danger-dim)");
     modeLabel.textContent = "VULNERABLE MODE";
-    modeCaption.textContent = "Guardrails are OFF — the system runs in its unprotected state";
+    modeCaption.textContent =
+      "Guardrails are OFF — the system runs in its unprotected state";
   }
 }
 secureToggle.addEventListener("click", () => setMode(!state.secureMode));
 setMode(false);
 
 // ---------- PROVIDERS ----------
+const PROVIDER_LABELS = {
+  openai: "OpenAI",
+  claude: "Claude",
+  gemini: "Gemini",
+  custom: "Custom",
+  mock: "Mock",
+};
+const providerLabel = (id) =>
+  PROVIDER_LABELS[id] || id.charAt(0).toUpperCase() + id.slice(1);
+
+function setProviderDropdownOpen(open) {
+  providerDropdown.classList.toggle("open", open);
+  providerTrigger.setAttribute("aria-expanded", String(open));
+}
+
+function setProviderTrigger(p) {
+  const ok = p.configured || p.id === "mock";
+  providerTriggerDot.className = "provider-dot " + (ok ? "ok" : "missing");
+  providerTriggerText.textContent = providerLabel(p.id);
+}
+
+providerTrigger.addEventListener("click", () => {
+  setProviderDropdownOpen(!providerDropdown.classList.contains("open"));
+});
+document.addEventListener("click", (e) => {
+  if (!providerDropdown.contains(e.target)) setProviderDropdownOpen(false);
+});
+
 async function loadProviders() {
   const res = await fetch("/api/providers");
   const providers = await res.json();
   providerList.innerHTML = "";
   providers.forEach((p) => {
     const item = document.createElement("div");
-    item.className = "provider-item" + (p.id === state.provider ? " selected" : "");
+    item.className =
+      "provider-item" + (p.id === state.provider ? " selected" : "");
+    item.setAttribute("role", "option");
     item.innerHTML = `
-      <span>${p.id}</span>
-      <span class="provider-dot ${p.configured ? "ok" : (p.id === "mock" ? "ok" : "missing")}"></span>
+      <span>${providerLabel(p.id)}</span>
+      <span class="provider-dot ${p.configured ? "ok" : p.id === "mock" ? "ok" : "missing"}"></span>
     `;
     item.addEventListener("click", () => {
       state.provider = p.id;
-      document.querySelectorAll(".provider-item").forEach((n) => n.classList.remove("selected"));
+      document
+        .querySelectorAll(".provider-item")
+        .forEach((n) => n.classList.remove("selected"));
       item.classList.add("selected");
-      setStatus(`Provider: ${p.id}`);
+      setProviderTrigger(p);
+      setProviderDropdownOpen(false);
+      setStatus(`Provider: ${providerLabel(p.id)}`);
     });
     providerList.appendChild(item);
+    if (p.id === state.provider) setProviderTrigger(p);
   });
 }
 
 // ---------- SCENARIOS ----------
-async function loadScenarios() {
-  const res = await fetch("/api/scenarios");
-  const scenarios = await res.json();
-  state.scenarios = scenarios;
+// Pulls a short catalog code ("LLM01", "ASI04", ...) out of the scenario's
+// OWASP mapping (falling back to its ASI mapping) for the card header. Some
+// scenarios predate a clean OWASP category and only carry the ASI one.
+function scenarioCode(s) {
+  const fromOwasp = /^(LLM\d+|ASI\d+)/.exec(s.owasp || "");
+  if (fromOwasp) return fromOwasp[1];
+  const fromAsi = /^(LLM\d+|ASI\d+)/.exec(s.asi || "");
+  return fromAsi ? fromAsi[1] : "NEW";
+}
+
+function renderScenarioCards() {
+  const filtered =
+    state.activeTags.size === 0
+      ? state.scenarios
+      : state.scenarios.filter((s) => s.threat_tags.some((t) => state.activeTags.has(t)));
+
   scenarioList.innerHTML = "";
-  scenarios.forEach((s) => {
+  if (!filtered.length) {
+    scenarioList.innerHTML = `<p class="empty-hint">No scenarios match the selected tags.</p>`;
+    return;
+  }
+  filtered.forEach((s) => {
     const card = document.createElement("div");
     card.className = "scenario-card";
     card.innerHTML = `
-      <div class="scenario-title">${s.title}</div>
-      <div class="scenario-sub">${s.subtitle}</div>
+      <div class="scenario-head">
+        <span class="scenario-num">${String(s._num).padStart(2, "0")}</span>
+        <span class="scenario-title" title="${s.title}">${s.title}</span>
+        <span class="scenario-code">${scenarioCode(s)}</span>
+      </div>
+      <div class="scenario-sub" title="${s.subtitle}">${s.subtitle}</div>
       <div class="tag-row">${s.threat_tags.map((t) => `<span class="tag">${t}</span>`).join("")}</div>
     `;
     card.addEventListener("click", () => {
@@ -81,19 +156,91 @@ async function loadScenarios() {
   });
 }
 
+function setTagFilterOpen(open) {
+  tagFilterDropdown.classList.toggle("open", open);
+  tagFilterTrigger.setAttribute("aria-expanded", String(open));
+}
+
+function updateTagFilterTrigger() {
+  const n = state.activeTags.size;
+  tagFilterTriggerText.textContent = n ? `${n} tag${n > 1 ? "s" : ""} selected` : "Filter by tag";
+  tagFilterDropdown.classList.toggle("has-active", n > 0);
+}
+
+function toggleTag(tag) {
+  if (state.activeTags.has(tag)) {
+    state.activeTags.delete(tag);
+  } else {
+    state.activeTags.add(tag);
+  }
+  tagFilterOptions.querySelectorAll(".tag-filter-option").forEach((opt) => {
+    opt.classList.toggle("active", state.activeTags.has(opt.dataset.tag));
+  });
+  updateTagFilterTrigger();
+  renderScenarioCards();
+}
+
+function renderTagFilterOptions() {
+  const counts = new Map();
+  state.scenarios.forEach((s) =>
+    s.threat_tags.forEach((t) => counts.set(t, (counts.get(t) || 0) + 1))
+  );
+  const tags = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+  tagFilterOptions.innerHTML = tags
+    .map(
+      (t) => `
+      <div class="tag-filter-option" data-tag="${t}" role="option">
+        <span class="tag-filter-checkbox"></span>
+        <span>${t}</span>
+        <span class="tag-filter-option-count">${counts.get(t)}</span>
+      </div>
+    `
+    )
+    .join("");
+  tagFilterOptions.querySelectorAll(".tag-filter-option").forEach((opt) => {
+    opt.addEventListener("click", () => toggleTag(opt.dataset.tag));
+  });
+}
+
+tagFilterTrigger.addEventListener("click", () => {
+  setTagFilterOpen(!tagFilterDropdown.classList.contains("open"));
+});
+tagFilterClear.addEventListener("click", () => {
+  state.activeTags.clear();
+  tagFilterOptions
+    .querySelectorAll(".tag-filter-option")
+    .forEach((opt) => opt.classList.remove("active"));
+  updateTagFilterTrigger();
+  renderScenarioCards();
+});
+document.addEventListener("click", (e) => {
+  if (!tagFilterDropdown.contains(e.target)) setTagFilterOpen(false);
+});
+
+async function loadScenarios() {
+  const res = await fetch("/api/scenarios");
+  const scenarios = await res.json();
+  scenarios.forEach((s, i) => (s._num = i + 1));
+  state.scenarios = scenarios;
+  renderTagFilterOptions();
+  renderScenarioCards();
+}
+
 function renderAttackFlow(s) {
   const box = el("#tab-flow");
   const doc = s.target_doc
     ? state.documents.find((d) => d.filename === s.target_doc)
     : null;
-  const targetBlock = s.target_doc ? `
+  const targetBlock = s.target_doc
+    ? `
     <div class="flow-target">
       <div class="kv"><span>Target document</span><span>${s.target_doc}</span></div>
       <div class="kv"><span>Location</span><span>/data/documents</span></div>
       <div class="kv"><span>Classification</span><span>${s.target_doc_classification}</span></div>
       <div class="kv"><span>Store</span><span>TF-IDF vector index</span></div>
     </div>
-  ` : `
+  `
+    : `
     <div class="flow-target">
       <div class="kv"><span>Target document</span><span>none — direct attack</span></div>
       <div class="kv"><span>Attacker</span><span>the end user, typed directly</span></div>
@@ -111,10 +258,16 @@ function renderAttackFlow(s) {
     <div class="flow-text">${s.demonstrates}</div>
     <div class="flow-section-title">Attack flow (attacker's-eye view)</div>
     <ul class="flow-steps">
-      ${s.attack_flow.map((step, i) => {
-        const cls = /VULNERABLE:/.test(step) ? "vuln" : (/PROTECTED:/.test(step) ? "prot" : "");
-        return `<li class="${cls}"><span class="step-num">${i + 1}</span>${escapeHtml(step)}</li>`;
-      }).join("")}
+      ${s.attack_flow
+        .map((step, i) => {
+          const cls = /VULNERABLE:/.test(step)
+            ? "vuln"
+            : /PROTECTED:/.test(step)
+              ? "prot"
+              : "";
+          return `<li class="${cls}"><span class="step-num">${i + 1}</span>${escapeHtml(step)}</li>`;
+        })
+        .join("")}
     </ul>
     <div class="flow-section-title">Mechanism</div>
     <div class="mechanism-box">${s.mechanism}</div>
@@ -126,12 +279,72 @@ function renderAttackFlow(s) {
 }
 
 // ---------- DOCUMENTS ----------
-async function loadDocuments() {
-  const res = await fetch("/api/documents");
-  const docs = await res.json();
-  state.documents = docs;
-  docCount.textContent = `(${docs.length})`;
+const DOC_FILTER_ORDER = ["all", "public", "internal", "confidential"];
+let docFilterCounts = { all: 0, public: 0, internal: 0, confidential: 0 };
+
+function setDocFilterDropdownOpen(open) {
+  docFilterDropdown.classList.toggle("open", open);
+  docFilterTrigger.setAttribute("aria-expanded", String(open));
+}
+
+function setDocFilterTrigger(filter) {
+  docFilterTriggerDot.dataset.filter = filter;
+  docFilterTriggerText.textContent = filter.charAt(0).toUpperCase() + filter.slice(1);
+  docFilterTriggerCount.textContent = `(${docFilterCounts[filter] || 0})`;
+}
+
+docFilterTrigger.addEventListener("click", () => {
+  setDocFilterDropdownOpen(!docFilterDropdown.classList.contains("open"));
+});
+document.addEventListener("click", (e) => {
+  if (!docFilterDropdown.contains(e.target)) setDocFilterDropdownOpen(false);
+});
+
+function setDocFilter(filter) {
+  state.docFilter = filter;
+  docFilters.querySelectorAll(".doc-filter-option").forEach((opt) => {
+    opt.classList.toggle("active", opt.dataset.filter === filter);
+  });
+  setDocFilterTrigger(filter);
+  setDocFilterDropdownOpen(false);
+  renderDocList();
+}
+
+function renderDocFilters() {
+  docFilterCounts = { all: state.documents.length, public: 0, internal: 0, confidential: 0 };
+  state.documents.forEach((d) => {
+    if (docFilterCounts[d.classification] !== undefined) docFilterCounts[d.classification]++;
+  });
+  docFilters.innerHTML = DOC_FILTER_ORDER.map(
+    (f) => `
+      <div
+        class="doc-filter-option${f === state.docFilter ? " active" : ""}"
+        data-filter="${f}"
+        role="option"
+      >
+        <span class="filter-dot" data-filter="${f}"></span>
+        ${f.charAt(0).toUpperCase() + f.slice(1)}
+        <span class="filter-count">${docFilterCounts[f] || 0}</span>
+      </div>
+    `
+  ).join("");
+  docFilters.querySelectorAll(".doc-filter-option").forEach((opt) => {
+    opt.addEventListener("click", () => setDocFilter(opt.dataset.filter));
+  });
+  setDocFilterTrigger(state.docFilter);
+}
+
+function renderDocList() {
+  const docs =
+    state.docFilter === "all"
+      ? state.documents
+      : state.documents.filter((d) => d.classification === state.docFilter);
+  docCount.textContent = `(${docs.length}/${state.documents.length})`;
   docList.innerHTML = "";
+  if (!docs.length) {
+    docList.innerHTML = `<p class="empty-hint">No documents in this category.</p>`;
+    return;
+  }
   docs.forEach((d) => {
     const item = document.createElement("div");
     item.className = "doc-item";
@@ -143,19 +356,33 @@ async function loadDocuments() {
   });
 }
 
+async function loadDocuments() {
+  const res = await fetch("/api/documents");
+  const docs = await res.json();
+  state.documents = docs;
+  renderDocFilters();
+  renderDocList();
+}
+
 // ---------- ARCHITECTURE MODAL ----------
 async function buildArchitecture() {
   const body = el("#architectureBody");
-  const owaspRows = state.scenarios.map((s) => `
+  const owaspRows = state.scenarios
+    .map(
+      (s) => `
     <tr>
       <td>${s.title}</td>
       <td class="owasp-tag">${s.owasp}</td>
-      <td class="asi-tag">${s.asi ? s.asi : "<span class=\"muted\">— not agent/tool-specific</span>"}</td>
+      <td class="asi-tag">${s.asi ? s.asi : '<span class="muted">— not agent/tool-specific</span>'}</td>
       <td>${s.target_doc ? s.target_doc : "— (direct attack)"}</td>
     </tr>
-  `).join("");
+  `,
+    )
+    .join("");
 
-  const docRows = state.documents.map((d) => `<li><code>${d.filename}</code> — ${d.classification}</li>`).join("");
+  const docRows = state.documents
+    .map((d) => `<li><code>${d.filename}</code> — ${d.classification}</li>`)
+    .join("");
 
   body.innerHTML = `
     <div>
@@ -227,9 +454,12 @@ el("#openArchitecture").addEventListener("click", async () => {
   await buildArchitecture();
   el("#architectureModal").classList.add("open");
 });
-el("#closeArchitecture").addEventListener("click", () => el("#architectureModal").classList.remove("open"));
+el("#closeArchitecture").addEventListener("click", () =>
+  el("#architectureModal").classList.remove("open"),
+);
 el("#architectureModal").addEventListener("click", (e) => {
-  if (e.target.id === "architectureModal") el("#architectureModal").classList.remove("open");
+  if (e.target.id === "architectureModal")
+    el("#architectureModal").classList.remove("open");
 });
 
 // ---------- HARDENING SCORECARD ----------
@@ -237,8 +467,10 @@ el("#architectureModal").addEventListener("click", (e) => {
 // server-side (see /api/scorecard) and renders a pass/fail scorecard — the
 // same check a CI/CD regression gate would run before a deploy.
 function verdictBadge(v) {
-  if (v === "neutralized") return `<span class="verdict-tag safe">🛡️ neutralized</span>`;
-  if (v === "succeeded") return `<span class="verdict-tag danger">⚠️ succeeded</span>`;
+  if (v === "neutralized")
+    return `<span class="verdict-tag safe">🛡️ neutralized</span>`;
+  if (v === "succeeded")
+    return `<span class="verdict-tag danger">⚠️ succeeded</span>`;
   return `<span class="muted">—</span>`;
 }
 
@@ -249,15 +481,19 @@ async function buildScorecard() {
   const data = await res.json();
   const { total, neutralized, score_pct } = data.summary;
 
-  const rows = data.results.map((r) => `
+  const rows = data.results
+    .map(
+      (r) => `
     <tr>
       <td>${r.title}</td>
-      <td class="asi-tag">${r.asi ? r.asi : "<span class=\"muted\">—</span>"}</td>
+      <td class="asi-tag">${r.asi ? r.asi : '<span class="muted">—</span>'}</td>
       <td>${verdictBadge(r.vulnerable.verdict)}</td>
       <td>${verdictBadge(r.protected.verdict)}</td>
       <td>${r.neutralized ? "✅" : "❌"}</td>
     </tr>
-  `).join("");
+  `,
+    )
+    .join("");
 
   body.innerHTML = `
     <div class="score-hero">
@@ -280,9 +516,12 @@ el("#openScorecard").addEventListener("click", async () => {
   el("#scorecardModal").classList.add("open");
   await buildScorecard();
 });
-el("#closeScorecard").addEventListener("click", () => el("#scorecardModal").classList.remove("open"));
+el("#closeScorecard").addEventListener("click", () =>
+  el("#scorecardModal").classList.remove("open"),
+);
 el("#scorecardModal").addEventListener("click", (e) => {
-  if (e.target.id === "scorecardModal") el("#scorecardModal").classList.remove("open");
+  if (e.target.id === "scorecardModal")
+    el("#scorecardModal").classList.remove("open");
 });
 
 // ---------- CHAT ----------
@@ -290,21 +529,29 @@ el("#scorecardModal").addEventListener("click", (e) => {
 // mode it was actually generated under, independent of the CURRENT toggle
 // position. This is what lets you scroll back through a mixed-mode demo
 // transcript without misreading which answer came from which mode.
-function appendMessage(role, text, blocked = false, meta = null) {
+function appendMessage(role, text, blocked = false, meta = null, animate = false) {
   const wrap = document.createElement("div");
-  const modeClass = meta ? (meta.secureMode ? " mode-protected" : " mode-vulnerable") : "";
-  wrap.className = `msg ${role}${blocked ? " blocked" : ""}${modeClass}`;
+  const modeClass = meta
+    ? meta.secureMode
+      ? " mode-protected"
+      : " mode-vulnerable"
+    : "";
+  wrap.className = `msg msg-enter ${role}${blocked ? " blocked" : ""}${modeClass}`;
+
+  const col = document.createElement("div");
+  col.className = "msg-col";
+
   const bubble = document.createElement("div");
   bubble.className = "msg-bubble";
-  bubble.textContent = text;
-  wrap.appendChild(bubble);
+  bubble.textContent = animate ? "" : text;
+  col.appendChild(bubble);
 
   if (role === "assistant" && meta) {
     const metaLine = document.createElement("div");
     metaLine.className = "msg-meta";
     const modeTag = meta.secureMode
-      ? `<span class="mode-tag prot">🟢 PROTECTED</span>`
-      : `<span class="mode-tag vuln">🔴 VULNERABLE</span>`;
+      ? `<span class="mode-tag prot"><span class="mode-dot"></span>PROTECTED</span>`
+      : `<span class="mode-tag vuln"><span class="mode-dot"></span>VULNERABLE</span>`;
     let verdictTag = "";
     if (meta.verdict === "neutralized") {
       verdictTag = `<span class="verdict-tag safe">🛡️ attack neutralized</span>`;
@@ -312,11 +559,49 @@ function appendMessage(role, text, blocked = false, meta = null) {
       verdictTag = `<span class="verdict-tag danger">⚠️ attack succeeded</span>`;
     }
     metaLine.innerHTML = `${modeTag} <span class="msg-provider">· ${meta.provider}</span> ${verdictTag}`;
-    wrap.appendChild(metaLine);
+    col.appendChild(metaLine);
   }
 
+  wrap.appendChild(col);
   chatWindow.appendChild(wrap);
   chatWindow.scrollTop = chatWindow.scrollHeight;
+  if (animate) typewriterReveal(bubble, text);
+}
+
+// Reveals text a few characters at a time instead of all at once, so the
+// assistant bubble reads as "typing" rather than popping in fully formed.
+// Speed scales with length but is capped so long answers don't drag on.
+function typewriterReveal(bubbleEl, text) {
+  const tickMs = 20;
+  const targetDurationMs = Math.min(1800, Math.max(400, text.length * 12));
+  const totalTicks = Math.max(1, Math.round(targetDurationMs / tickMs));
+  const charsPerTick = Math.max(1, Math.ceil(text.length / totalTicks));
+  bubbleEl.classList.add("typing-cursor");
+  let i = 0;
+  const timer = setInterval(() => {
+    i += charsPerTick;
+    bubbleEl.textContent = text.slice(0, i);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+    if (i >= text.length) {
+      clearInterval(timer);
+      bubbleEl.classList.remove("typing-cursor");
+    }
+  }, tickMs);
+}
+
+function appendTypingIndicator() {
+  const wrap = document.createElement("div");
+  wrap.className = "msg msg-enter assistant typing-indicator";
+  const col = document.createElement("div");
+  col.className = "msg-col";
+  const bubble = document.createElement("div");
+  bubble.className = "msg-bubble";
+  bubble.innerHTML = `<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`;
+  col.appendChild(bubble);
+  wrap.appendChild(col);
+  chatWindow.appendChild(wrap);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+  return wrap;
 }
 
 function setStatus(text) {
@@ -344,7 +629,11 @@ function computeVerdict(securityLog) {
 // keyword filters. See guardrails.try_decode_obfuscations() on the backend
 // for the matching decode-before-match defense.
 function toBase64(str) {
-  try { return btoa(unescape(encodeURIComponent(str))); } catch { return str; }
+  try {
+    return btoa(unescape(encodeURIComponent(str)));
+  } catch {
+    return str;
+  }
 }
 function toRot13(str) {
   return str.replace(/[a-zA-Z]/g, (c) => {
@@ -376,6 +665,7 @@ el("#chatForm").addEventListener("submit", async (e) => {
   state.history.push({ role: "user", content: message });
   el("#sendBtn").disabled = true;
   setStatus("Processing…");
+  const typingIndicator = appendTypingIndicator();
 
   try {
     const res = await fetch("/api/chat", {
@@ -389,18 +679,30 @@ el("#chatForm").addEventListener("submit", async (e) => {
       }),
     });
     const data = await res.json();
+    typingIndicator.remove();
     const verdict = computeVerdict(data.security_log);
-    appendMessage("assistant", data.answer, data.blocked, {
-      secureMode: data.secure_mode, provider: data.provider, verdict,
-    });
+    appendMessage(
+      "assistant",
+      data.answer,
+      data.blocked,
+      { secureMode: data.secure_mode, provider: data.provider, verdict },
+      true
+    );
     state.history.push({ role: "assistant", content: data.answer });
 
     renderContext(data.retrieved_chunks || []);
     renderLog(data.security_log || []);
     renderTools(data.tool_events || []);
-    activateTab("context");
-    setStatus(`Done · ${data.provider} · ${data.secure_mode ? "PROTECTED" : "VULNERABLE"}`);
+    // A non-empty security_log means a guardrail (including the semantic
+    // judge) actually fired for this message — surface that directly
+    // instead of always landing on Retrieved Context, which stayed silent
+    // even when e.g. a free-typed jailbreak attempt was caught.
+    activateTab((data.security_log || []).length ? "log" : "context");
+    setStatus(
+      `Done · ${data.provider} · ${data.secure_mode ? "PROTECTED" : "VULNERABLE"}`,
+    );
   } catch (err) {
+    typingIndicator.remove();
     appendMessage("assistant", "⚠️ Could not reach the server: " + err.message);
     setStatus("Error");
   } finally {
@@ -414,10 +716,15 @@ function renderContext(chunks) {
     box.innerHTML = `<p class="empty-hint">No relevant document found for this query.</p>`;
     return;
   }
-  box.innerHTML = chunks.map((c) => {
-    const flagged = c.injection_detected;
-    const cls = flagged ? (c.safe_text !== c.text ? "sanitized" : "flagged") : "";
-    return `
+  box.innerHTML = chunks
+    .map((c) => {
+      const flagged = c.injection_detected;
+      const cls = flagged
+        ? c.safe_text !== c.text
+          ? "sanitized"
+          : "flagged"
+        : "";
+      return `
       <div class="ctx-chunk ${cls}">
         <div class="ctx-head">
           <span class="ctx-fname">${c.doc}</span>
@@ -428,7 +735,8 @@ function renderContext(chunks) {
         ${flagged && c.safe_text === c.text ? `<div class="ctx-warn">⚠ Injection pattern detected (${c.matched_patterns.join(", ")}) but secure mode is OFF — the model sees this</div>` : ""}
       </div>
     `;
-  }).join("");
+    })
+    .join("");
 }
 
 function renderLog(entries) {
@@ -437,12 +745,16 @@ function renderLog(entries) {
     box.innerHTML = `<p class="empty-hint">No security event triggered for this query.</p>`;
     return;
   }
-  box.innerHTML = entries.map((e) => `
+  box.innerHTML = entries
+    .map(
+      (e) => `
     <div class="log-entry ${e.severity}">
       <div class="log-stage">${e.stage} · ${e.severity}</div>
       <div>${escapeHtml(e.message)}</div>
     </div>
-  `).join("");
+  `,
+    )
+    .join("");
 }
 
 function renderTools(events) {
@@ -451,13 +763,17 @@ function renderTools(events) {
     box.innerHTML = `<p class="empty-hint">No tool call was attempted for this query.</p>`;
     return;
   }
-  box.innerHTML = events.map((t) => `
+  box.innerHTML = events
+    .map(
+      (t) => `
     <div class="tool-event ${t.status}">
       <div><code>${t.tool}(${escapeHtml(t.args)})</code></div>
       <div style="margin-top:6px;">${t.status === "executed" ? "🔴 EXECUTED" : "🟢 BLOCKED"} — ${escapeHtml(t.result)}</div>
       <div style="margin-top:4px; color:var(--text-dim); font-size:10.5px;">source: ${t.source}</div>
     </div>
-  `).join("");
+  `,
+    )
+    .join("");
 }
 
 function escapeHtml(str) {
@@ -467,16 +783,71 @@ function escapeHtml(str) {
 }
 
 // ---------- TABS ----------
+const tabsEl = el("#tabs");
+const tabIndicator = el("#tabIndicator");
+
+function moveTabIndicator() {
+  const activeBtn = tabsEl.querySelector(".tab-btn.active");
+  if (!activeBtn) return;
+  tabIndicator.style.left = `${activeBtn.offsetLeft}px`;
+  tabIndicator.style.width = `${activeBtn.offsetWidth}px`;
+}
+
 function activateTab(name) {
-  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  document.querySelectorAll(".tab-content").forEach((c) => c.classList.toggle("active", c.id === `tab-${name}`));
+  document
+    .querySelectorAll(".tab-btn")
+    .forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  document
+    .querySelectorAll(".tab-content")
+    .forEach((c) => c.classList.toggle("active", c.id === `tab-${name}`));
+  moveTabIndicator();
 }
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => activateTab(btn.dataset.tab));
 });
+window.addEventListener("resize", moveTabIndicator);
+requestAnimationFrame(moveTabIndicator);
+
+// ---------- COLLAPSIBLE SIDEBAR SECTIONS ----------
+// Lets a section be closed to free its space for the others (the two
+// scrollable ones are flex-based, so collapsing one hands its share
+// straight to whichever stays open) instead of everything fighting over a
+// fixed sidebar height.
+function setupCollapsibleBlocks() {
+  document.querySelectorAll(".left-panel > .block").forEach((block) => {
+    const h2 = block.querySelector("h2");
+    if (!h2 || h2.querySelector(".block-collapse-btn")) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "block-collapse-btn";
+    btn.setAttribute("aria-label", "Toggle section");
+    btn.setAttribute("aria-expanded", "true");
+    btn.innerHTML = `<span class="block-collapse-caret">▾</span>`;
+    btn.addEventListener("click", () => {
+      const collapsed = block.classList.toggle("collapsed");
+      btn.setAttribute("aria-expanded", String(!collapsed));
+    });
+    h2.appendChild(btn);
+  });
+}
+
+// ---------- COLLAPSIBLE LEFT/RIGHT PANELS ----------
+const layoutEl = document.querySelector(".layout");
+function setupCollapsiblePanels() {
+  el("#leftPanelToggle").addEventListener("click", () => {
+    const collapsed = layoutEl.classList.toggle("left-collapsed");
+    el("#leftPanelToggle").setAttribute("aria-expanded", String(!collapsed));
+  });
+  el("#rightPanelToggle").addEventListener("click", () => {
+    const collapsed = layoutEl.classList.toggle("right-collapsed");
+    el("#rightPanelToggle").setAttribute("aria-expanded", String(!collapsed));
+  });
+}
 
 // ---------- INIT ----------
 (async function init() {
+  setupCollapsibleBlocks();
+  setupCollapsiblePanels();
   await loadDocuments();
   await loadScenarios();
   await loadProviders();

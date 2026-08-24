@@ -96,8 +96,8 @@ def run_pipeline(message: str, provider_name: str, secure_mode: bool,
     if secure_mode and jb_matches:
         security_log.append({
             "stage": "input_guardrail", "severity": "blocked",
-            "message": f"The user message matched a known instruction-override pattern "
-                       f"({jb_matches[0]}). The request was rejected before ever reaching the model.",
+            "message": f"The user message matched a known pattern or was flagged by the semantic "
+                       f"judge ({jb_matches[0]}). The request was rejected before ever reaching the model.",
         })
         return {
             "answer": "I can't help with that: your message matched a pattern for changing or "
@@ -125,7 +125,7 @@ def run_pipeline(message: str, provider_name: str, secure_mode: bool,
             security_log.append({
                 "stage": "context_sanitization",
                 "severity": "sanitized" if secure_mode else "not_blocked",
-                "message": f"An injection pattern was detected inside {c['doc']} "
+                "message": f"An injection pattern or semantic judge match was detected inside {c['doc']} "
                            f"({', '.join(c['matched_patterns'])}). " +
                            ("The offending sentence was stripped from the context before the model saw it."
                             if secure_mode else

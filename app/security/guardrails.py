@@ -36,6 +36,8 @@ import base64
 import codecs
 import re
 
+from app.security.judge import semantic_judge
+
 INJECTION_PATTERNS = [
     r"override directive",
     r"disregard your standard operating guidelines",
@@ -139,6 +141,17 @@ def detect_patterns(text: str, patterns) -> list[str]:
         found = [p.pattern for p in patterns if p.search(decoded)]
         if found:
             return [f"{f} [decoded from obfuscated payload]" for f in found]
+        
+    # Still nothing literal -- fall back to the semantic judge, an offline
+    # TF-IDF/Logistic Regression classifier that catches paraphrased attack
+    # intent regex structurally cannot (see app/security/judge.py). High
+    # threshold by design: a borderline call is left alone rather than
+    # blocking a real question.
+    result = semantic_judge.judge(text)
+    if result.is_attack:
+        return [f"semantic judge: {result.confidence:.0%} confidence, "
+                f"resembles known attack pattern \"{result.nearest_example}\""]
+
     return []
 
 
